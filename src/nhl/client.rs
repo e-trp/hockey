@@ -1,3 +1,4 @@
+use reqwest::retry;
 #[allow(dead_code)]
 #[allow(unused)]
 use reqwest::{Client, ClientBuilder};
@@ -5,6 +6,7 @@ use serde::de::DeserializeOwned;
 use std::borrow::Cow;
 use std::time::Duration;
 
+const BASE_HOST: &str = "api-web.nhle.com";
 const BASE_URL: &str = "https://api-web.nhle.com/v1";
 
 pub type ReqwestResult<T> = Result<T, reqwest::Error>;
@@ -28,8 +30,10 @@ impl<'a> ApiEndpoint<'a> {
 
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
-    base_url:  &'static str,
+    host: &'static str,
+    api_url: &'static str,
     timeout: Duration,
+    retry: u32,
 }
 
 #[derive(Debug)]
@@ -41,23 +45,28 @@ pub struct ApiClient {
 impl Default for ClientConfig {
     fn default() -> Self {
         Self {
-            base_url: BASE_URL,
+            host: BASE_HOST,
+            api_url: BASE_URL,
             timeout: Duration::from_secs(30),
+            retry: 3,
         }
     }
 }
 
 impl ApiClient {
     pub fn new(config: ClientConfig) -> Self {
-        let timeout = config.timeout;
         Self {
+            http_client: ClientBuilder::new()
+                .timeout(config.timeout)
+                .retry(retry::for_host(config.host).max_retries_per_request(config.retry))
+                .build()
+                .unwrap(),
             config,
-            http_client: ClientBuilder::new().timeout(timeout).build().unwrap(),
         }
     }
 
     fn build_url(&self, path: &str) -> String {
-        format!("{}/{}", self.config.base_url, path)
+        format!("{}/{}", self.config.api_url, path)
     }
 
     pub async fn fetch<T: DeserializeOwned>(&self, endpoint: ApiEndpoint<'_>) -> ReqwestResult<T> {

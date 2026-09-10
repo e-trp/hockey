@@ -7,7 +7,9 @@ pub struct NHLService {
 
 impl NHLService {
     pub fn new() -> Self {
-        Self{ api_client: ApiClient::new(ClientConfig::default())}
+        Self {
+            api_client: ApiClient::new(ClientConfig::default()),
+        }
     }
 
     pub async fn fetch_standings(&self) -> ReqwestResult<Table> {
