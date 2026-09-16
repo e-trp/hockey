@@ -1,5 +1,5 @@
 use regex::Regex;
-use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue, USER_AGENT, ORIGIN, REFERER};
 use reqwest::{Client, ClientBuilder, retry};
 use serde::de::DeserializeOwned;
 use std::time::Duration;
@@ -11,14 +11,30 @@ const BASE_URL: &str = "https://www.khl.ru";
 
 pub enum ApiEndpoint {
     StandingsNow,
-    TeamDetails
+    TeamDetails(u32),
 }
 
-impl ApiEndpoint{
-    fn as_path(&self) -> &str {
+pub struct ApiAgrs<'a> {
+    path: &'a str,
+    args: Vec<(String, String)>,
+}
+
+impl ApiEndpoint {
+    fn api_args(&self) -> ApiAgrs<'_> {
         match self {
-            ApiEndpoint::StandingsNow => "rest/standings/regular/",
-            ApiEndpoint::TeamDetails => "rest/clubs/main/"
+            ApiEndpoint::StandingsNow => ApiAgrs {
+                path: "rest/standings/regular/",
+                args: vec![
+                    ("values[type]".to_string(), "regular".to_string()),
+                ],
+            },
+
+            ApiEndpoint::TeamDetails(clubid) => ApiAgrs {
+                path: "rest/clubs/main/",
+                args: vec![
+                    ("values[club_id]".to_string(), clubid.to_string()),
+                ],
+            },
         }
     }
 }
@@ -130,19 +146,16 @@ impl ApiClient {
         if self.session_id.is_none() {
             self.refresh_session().await?;
         }
-        dbg!(self.session_id.clone().unwrap());
-        let url = self.build_url(endpoint.as_path());
-        dbg!(&url);
-        let params = [
-            ("values[type]".to_string(), "regular".to_string()),
-            ("sessid".to_string(), self.session_id.clone().unwrap()),
-        ];
+        let endpoint_args = endpoint.api_args();
+        let mut params = endpoint_args.args;
+        params.push(("sessid".to_string(), self.session_id.clone().unwrap()));
+
         let response = self
             .http_client
-            .post(url)
+            .post(self.build_url(endpoint_args.path))
             .header("X-Requested-With", "XMLHttpRequest")
-            .header("Origin", self.config.api_url)
-            .header("Referer", self.config.api_url)
+            .header(ORIGIN, self.config.api_url)
+            .header(REFERER, self.config.api_url)
             .form(&params)
             .send()
             .await?;
