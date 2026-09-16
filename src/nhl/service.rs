@@ -5,6 +5,12 @@ pub struct NHLService {
     pub api_client: ApiClient,
 }
 
+impl Default for NHLService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NHLService {
     pub fn new() -> Self {
         Self {

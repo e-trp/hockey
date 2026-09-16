@@ -1,10 +1,27 @@
 use regex::Regex;
-use reqwest::header::{ACCEPT_LANGUAGE, HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue, USER_AGENT};
 use reqwest::{Client, ClientBuilder, retry};
+use serde::de::DeserializeOwned;
 use std::time::Duration;
 
-const BASE_HOST: &str = "khl.ru";
-const BASE_URL: &str = "https://khl.ru";
+const BASE_HOST: &str = "www.khl.ru";
+const BASE_URL: &str = "https://www.khl.ru";
+
+
+
+pub enum ApiEndpoint {
+    StandingsNow,
+    TeamDetails
+}
+
+impl ApiEndpoint{
+    fn as_path(&self) -> &str {
+        match self {
+            ApiEndpoint::StandingsNow => "rest/standings/regular/",
+            ApiEndpoint::TeamDetails => "rest/clubs/main/"
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -55,13 +72,17 @@ impl ApiClient {
                 USER_AGENT,
                 HeaderValue::from_static(
                     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
-             AppleWebKit/537.36 (KHTML, like Gecko) \
-             Chrome/140.0.0.0 Safari/537.36",
+                     AppleWebKit/537.36 (KHTML, like Gecko) \
+                     Chrome/140.0.0.0 Safari/537.36",
                 ),
             ),
             (
                 ACCEPT_LANGUAGE,
                 HeaderValue::from_static("ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7"),
+            ),
+            (
+                ACCEPT,
+                HeaderValue::from_static("application/json, text/javascript, */*; q=0.01"),
             ),
         ]);
 
@@ -81,7 +102,11 @@ impl ApiClient {
     }
 
     fn build_url(&self, path: &str) -> String {
-        format!("{}/{}", self.config.api_url, path)
+        format!(
+            "{}/{}",
+            self.config.api_url,//.trim_end_matches('/'),
+            path//.trim_start_matches('/')
+        )
     }
 
     async fn refresh_session(&mut self) -> ReqwestResult<()> {
@@ -101,25 +126,27 @@ impl ApiClient {
         }
     }
 
-    pub async fn fetch(&mut self) -> ReqwestResult<String> {
+    pub async fn fetch<T: DeserializeOwned>(&mut self, endpoint: ApiEndpoint) -> ReqwestResult<T> {
         if self.session_id.is_none() {
             self.refresh_session().await?;
         }
         dbg!(self.session_id.clone().unwrap());
-        let url = self.build_url("/rest/standings/regular/");
-        let session_id = self.session_id.clone().unwrap();
+        let url = self.build_url(endpoint.as_path());
+        dbg!(&url);
         let params = [
             ("values[type]".to_string(), "regular".to_string()),
-            ("sessid".to_string(), session_id),
+            ("sessid".to_string(), self.session_id.clone().unwrap()),
         ];
-        let response = self.http_client.post(url)
-                .header("X-Requested-With", "XMLHttpRequest")
-                .header("Origin", self.config.api_url)
-                .header("Referer", self.config.api_url)
-                .form(&params)
-                .send()
-                .await?;
-        let html_text = response.text().await?;
-        Ok(html_text)
+        let response = self
+            .http_client
+            .post(url)
+            .header("X-Requested-With", "XMLHttpRequest")
+            .header("Origin", self.config.api_url)
+            .header("Referer", self.config.api_url)
+            .form(&params)
+            .send()
+            .await?;
+        let json_response = response.json::<T>().await?;
+        Ok(json_response)
     }
 }
