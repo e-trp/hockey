@@ -75,3 +75,24 @@ impl<'de> Deserialize<'de> for Table {
         })
     }
 }
+
+#[derive(Deserialize, Debug)]
+pub struct  TeamDetail {
+    pub data: Data
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Data {
+    pub stat: Stats
+}
+#[derive(Deserialize, Debug)]
+pub struct  Stats {
+    pub gp: String, 
+    pub w: String, 
+    pub otw: String,
+    pub sow: String,
+    pub gf: String,
+    pub sum: String,
+    pub sum_proc: String
+
+}

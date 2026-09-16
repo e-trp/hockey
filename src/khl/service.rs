@@ -25,4 +25,13 @@ impl KHLService {
             .await?;
         Ok(data)
     }
+
+    pub async fn fetch_team(&mut self, teamid: u32) -> ReqwestResult<TeamDetail> {
+        let endpoint = ApiEndpoint::TeamDetails(teamid);
+        let data = self
+            .api_client
+            .fetch::<TeamDetail>(endpoint)
+            .await?;
+        Ok(data)
+    }
 }
