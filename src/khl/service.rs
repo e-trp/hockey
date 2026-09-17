@@ -18,7 +18,7 @@ impl KHLService {
         }
     }
 
-    pub async fn fetch_standings(&mut self) -> ReqwestResult<Table> {
+    pub async fn fetch_standings(&self) -> ReqwestResult<Table> {
         let data = self
             .api_client
             .fetch::<Table>(ApiEndpoint::StandingsNow)
@@ -26,12 +26,9 @@ impl KHLService {
         Ok(data)
     }
 
-    pub async fn fetch_team(&mut self, teamid: u32) -> ReqwestResult<TeamDetail> {
+    pub async fn fetch_team(&self, teamid: u32) -> ReqwestResult<TeamDetail> {
         let endpoint = ApiEndpoint::TeamDetails(teamid);
-        let data = self
-            .api_client
-            .fetch::<TeamDetail>(endpoint)
-            .await?;
+        let data = self.api_client.fetch::<TeamDetail>(endpoint).await?;
         Ok(data)
     }
 }

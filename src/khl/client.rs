@@ -1,13 +1,15 @@
 use regex::Regex;
-use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue, USER_AGENT, ORIGIN, REFERER};
+use reqwest::header::{
+    ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue, ORIGIN, REFERER, USER_AGENT,
+};
 use reqwest::{Client, ClientBuilder, retry};
 use serde::de::DeserializeOwned;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
 const BASE_HOST: &str = "www.khl.ru";
 const BASE_URL: &str = "https://www.khl.ru";
-
-
 
 pub enum ApiEndpoint {
     StandingsNow,
@@ -24,16 +26,12 @@ impl ApiEndpoint {
         match self {
             ApiEndpoint::StandingsNow => ApiAgrs {
                 path: "rest/standings/regular/",
-                args: vec![
-                    ("values[type]".to_string(), "regular".to_string()),
-                ],
+                args: vec![("values[type]".to_string(), "regular".to_string())],
             },
 
             ApiEndpoint::TeamDetails(clubid) => ApiAgrs {
                 path: "rest/clubs/main/",
-                args: vec![
-                    ("values[club_id]".to_string(), clubid.to_string()),
-                ],
+                args: vec![("values[club_id]".to_string(), clubid.to_string())],
             },
         }
     }
@@ -78,7 +76,7 @@ impl Default for ClientConfig {
 pub struct ApiClient {
     http_client: Client,
     config: ClientConfig,
-    session_id: Option<String>,
+    session_id: RwLock<Option<Arc<str>>>,
 }
 
 impl ApiClient {
@@ -113,42 +111,50 @@ impl ApiClient {
         Self {
             http_client,
             config,
-            session_id: None,
+            session_id: RwLock::new(None),
         }
     }
 
     fn build_url(&self, path: &str) -> String {
-        format!(
-            "{}/{}",
-            self.config.api_url,//.trim_end_matches('/'),
-            path//.trim_start_matches('/')
-        )
+        format!("{}/{}", self.config.api_url, path)
     }
 
-    async fn refresh_session(&mut self) -> ReqwestResult<()> {
+    async fn get_session_id(&self) -> ReqwestResult<Arc<str>> {
+        if let Some(session_id) = self.session_id.read().await.as_ref() {
+            return Ok(session_id.clone());
+        }
+
         let response = self
             .http_client
             .get(self.config.api_url)
             .send()
             .await?
             .error_for_status()?;
+
         let html_content = response.text().await?;
-        match self.config.session_re.captures(&html_content) {
-            Some(caps) => {
-                self.session_id = Some(caps.get(1).unwrap().as_str().to_string());
-                Ok(())
-            }
-            None => Err(ApiError::SessionIdNotFound),
-        }
+
+        let session_id = self
+            .config
+            .session_re
+            .captures(&html_content)
+            .and_then(|caps| caps.get(1))
+            .map(|m| Arc::<str>::from(m.as_str()))
+            .ok_or(ApiError::SessionIdNotFound)?;
+
+        // Сохраняем session id.
+        *self.session_id.write().await = Some(session_id.clone());
+
+        Ok(session_id)
     }
 
-    pub async fn fetch<T: DeserializeOwned>(&mut self, endpoint: ApiEndpoint) -> ReqwestResult<T> {
-        if self.session_id.is_none() {
-            self.refresh_session().await?;
-        }
+    pub async fn fetch<T: DeserializeOwned>(&self, endpoint: ApiEndpoint) -> ReqwestResult<T> {
+        let session_id = self.get_session_id().await?;
+
         let endpoint_args = endpoint.api_args();
+
         let mut params = endpoint_args.args;
-        params.push(("sessid".to_string(), self.session_id.clone().unwrap()));
+
+        params.push(("sessid".to_string(), session_id.to_string()));
 
         let response = self
             .http_client
@@ -158,8 +164,9 @@ impl ApiClient {
             .header(REFERER, self.config.api_url)
             .form(&params)
             .send()
-            .await?;
-        let json_response = response.json::<T>().await?;
-        Ok(json_response)
+            .await?
+            .error_for_status()?;
+
+        Ok(response.json::<T>().await?)
     }
 }

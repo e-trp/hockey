@@ -7,7 +7,7 @@ async fn main() -> Result<(), reqwest::Error> {
     let data = nhl_service.fetch_standings().await?;
     println!("{:?}", data);
 
-    let mut khl_service: KHLService = KHLService::new();
+    let khl_service: KHLService = KHLService::new();
     let response = khl_service.fetch_standings().await;
     println!("{:?}", response);
 
