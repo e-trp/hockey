@@ -1,5 +1,5 @@
-use crate::khl::client::{ApiClient, ApiEndpoint, ClientConfig, ReqwestResult};
-use crate::khl::structs::*;
+use crate::integrations::khl::client::{ApiClient, ApiEndpoint, ClientConfig, ReqwestResult};
+use crate::integrations::khl::structs::*;
 
 pub struct KHLService {
     pub api_client: ApiClient,

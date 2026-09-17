@@ -1,2 +1,1 @@
-pub mod khl;
-pub mod nhl;
+pub mod integrations;

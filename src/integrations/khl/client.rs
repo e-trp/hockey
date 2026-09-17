@@ -141,7 +141,6 @@ impl ApiClient {
             .map(|m| Arc::<str>::from(m.as_str()))
             .ok_or(ApiError::SessionIdNotFound)?;
 
-        // Сохраняем session id.
         *self.session_id.write().await = Some(session_id.clone());
 
         Ok(session_id)

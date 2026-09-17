@@ -1,5 +1,4 @@
-use hockey::khl::service::KHLService;
-use hockey::nhl::service::NHLService;
+use hockey::integrations::{ NHLService, KHLService};
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
