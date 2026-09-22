@@ -159,8 +159,8 @@ impl ApiClient {
             .http_client
             .post(self.build_url(endpoint_args.path))
             .header("X-Requested-With", "XMLHttpRequest")
-            .header(ORIGIN, self.config.api_url)
-            .header(REFERER, self.config.api_url)
+            .header(ORIGIN, self.config.host)
+            .header(REFERER, self.config.host)
             .form(&params)
             .send()
             .await?
