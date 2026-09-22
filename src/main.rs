@@ -1,4 +1,4 @@
-use hockey::integrations::{ NHLService, KHLService};
+use hockey::integrations::{KHLService, NHLService};
 
 #[tokio::main]
 async fn main() -> Result<(), reqwest::Error> {
@@ -11,6 +11,9 @@ async fn main() -> Result<(), reqwest::Error> {
     println!("{:?}", response);
 
     let response = khl_service.fetch_team(7u32).await;
+    println!("{:?}", response);
+
+    let response = khl_service.fetch_all_teams().await;
     println!("{:?}", response);
 
     Ok(())

@@ -2,7 +2,7 @@ use serde::{Deserialize, Deserializer};
 
 #[derive(Debug)]
 pub struct Table {
-    pub devisions: Vec<Division>,
+    pub divisions: Vec<Division>,
 }
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl<'de> Deserialize<'de> for Table {
         let root = Root::deserialize(deserializer)?;
 
         Ok(Table {
-            devisions: root
+            divisions: root
                 .data
                 .json
                 .divisions

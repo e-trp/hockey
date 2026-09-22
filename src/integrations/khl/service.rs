@@ -1,5 +1,6 @@
 use crate::integrations::khl::client::{ApiClient, ApiEndpoint, ClientConfig, ReqwestResult};
 use crate::integrations::khl::structs::*;
+use futures::future::join_all;
 
 pub struct KHLService {
     pub api_client: ApiClient,
@@ -30,5 +31,18 @@ impl KHLService {
         let endpoint = ApiEndpoint::TeamDetails(teamid);
         let data = self.api_client.fetch::<TeamDetail>(endpoint).await?;
         Ok(data)
+    }
+
+    pub async fn fetch_all_teams(&self) -> ReqwestResult<Vec<TeamDetail>> {
+        let all_team = join_all(
+            self.fetch_standings()
+                .await?
+                .divisions
+                .into_iter()
+                .flat_map(|divisions| divisions.teams)
+                .map(|team| self.fetch_team(team.clubid)),
+        )
+        .await;
+        Ok(all_team.into_iter().flatten().collect())
     }
 }
