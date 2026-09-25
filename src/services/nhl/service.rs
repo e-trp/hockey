@@ -1,5 +1,5 @@
-use crate::integrations::nhl::client::{ApiClient, ApiEndpoint, ClientConfig, ReqwestResult};
-use crate::integrations::nhl::structs::*;
+use crate::services::nhl::client::{ApiClient, ApiEndpoint, ClientConfig, ReqwestResult};
+use crate::services::nhl::structs::*;
 
 pub struct NHLService {
     pub api_client: ApiClient,
