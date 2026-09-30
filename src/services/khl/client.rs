@@ -1,55 +1,47 @@
+use std::borrow::Cow;
+use std::sync::Arc;
+use std::time::Duration;
+
 use regex::Regex;
 use reqwest::header::{
     ACCEPT, ACCEPT_LANGUAGE, HeaderMap, HeaderValue, ORIGIN, REFERER, USER_AGENT,
 };
 use reqwest::{Client, ClientBuilder, retry};
 use serde::de::DeserializeOwned;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::RwLock;
+
+use crate::services::traits::{ApiClient as ApiClientTrait, ApiResult, Endpoint, RequestParts};
 
 const BASE_HOST: &str = "www.khl.ru";
 const BASE_URL: &str = "https://www.khl.ru";
 
-pub enum ApiEndpoint {
+#[derive(Debug)]
+pub enum KhlEndpoint {
     StandingsNow,
     TeamDetails(u32),
 }
 
-pub struct ApiAgrs<'a> {
-    path: &'a str,
-    args: Vec<(String, String)>,
-}
-
-impl ApiEndpoint {
-    fn api_args(&self) -> ApiAgrs<'_> {
+impl Endpoint for KhlEndpoint {
+    fn parts(&self) -> RequestParts<'_> {
         match self {
-            ApiEndpoint::StandingsNow => ApiAgrs {
-                path: "rest/standings/regular/",
-                args: vec![("values[type]".to_string(), "regular".to_string())],
+            KhlEndpoint::StandingsNow => RequestParts {
+                path: Cow::Borrowed("rest/standings/regular/"),
+                args: Some(vec![(
+                    Cow::Borrowed("values[type]"),
+                    Cow::Borrowed("regular"),
+                )]),
             },
 
-            ApiEndpoint::TeamDetails(clubid) => ApiAgrs {
-                path: "rest/clubs/main/",
-                args: vec![("values[club_id]".to_string(), clubid.to_string())],
+            KhlEndpoint::TeamDetails(club_id) => RequestParts {
+                path: Cow::Borrowed("rest/clubs/main/"),
+                args: Some(vec![(
+                    Cow::Borrowed("values[club_id]"),
+                    Cow::Owned(club_id.to_string()),
+                )]),
             },
         }
     }
 }
-
-#[derive(Debug)]
-pub enum ApiError {
-    Request(reqwest::Error),
-    SessionIdNotFound,
-}
-
-impl From<reqwest::Error> for ApiError {
-    fn from(err: reqwest::Error) -> Self {
-        Self::Request(err)
-    }
-}
-
-pub type ReqwestResult<T> = Result<T, ApiError>;
 
 #[derive(Debug, Clone)]
 pub struct ClientConfig {
@@ -73,13 +65,14 @@ impl Default for ClientConfig {
     }
 }
 
-pub struct ApiClient {
+#[derive(Debug)]
+pub struct KHLApiClient {
     http_client: Client,
     config: ClientConfig,
     session_id: RwLock<Option<Arc<str>>>,
 }
 
-impl ApiClient {
+impl KHLApiClient {
     pub fn new(config: ClientConfig) -> Self {
         let headers = HeaderMap::from_iter([
             (
@@ -119,7 +112,7 @@ impl ApiClient {
         format!("{}/{}", self.config.api_url, path)
     }
 
-    async fn get_session_id(&self) -> ReqwestResult<Arc<str>> {
+    async fn get_session_id(&self) -> ApiResult<Arc<str>> {
         if let Some(session_id) = self.session_id.read().await.as_ref() {
             return Ok(session_id.clone());
         }
@@ -139,25 +132,36 @@ impl ApiClient {
             .captures(&html_content)
             .and_then(|caps| caps.get(1))
             .map(|m| Arc::<str>::from(m.as_str()))
-            .ok_or(ApiError::SessionIdNotFound)?;
+            .unwrap();
 
         *self.session_id.write().await = Some(session_id.clone());
 
         Ok(session_id)
     }
+}
 
-    pub async fn fetch<T: DeserializeOwned>(&self, endpoint: ApiEndpoint) -> ReqwestResult<T> {
+impl ApiClientTrait for KHLApiClient {
+    async fn fetch<E, T>(&self, endpoint: E) -> ApiResult<T>
+    where
+        E: Endpoint + Send,
+        T: DeserializeOwned + Send,
+    {
         let session_id = self.get_session_id().await?;
 
-        let endpoint_args = endpoint.api_args();
+        let parts = endpoint.parts();
 
-        let mut params = endpoint_args.args;
+        let mut params = parts
+            .args
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(key, value)| (key.into_owned(), value.into_owned()))
+            .collect::<Vec<_>>();
 
         params.push(("sessid".to_string(), session_id.to_string()));
 
         let response = self
             .http_client
-            .post(self.build_url(endpoint_args.path))
+            .post(self.build_url(&parts.path))
             .header("X-Requested-With", "XMLHttpRequest")
             .header(ORIGIN, self.config.host)
             .header(REFERER, self.config.host)
@@ -166,6 +170,8 @@ impl ApiClient {
             .await?
             .error_for_status()?;
 
-        Ok(response.json::<T>().await?)
+        let data = response.json::<T>().await?;
+
+        Ok(data)
     }
 }

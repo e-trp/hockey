@@ -1,9 +1,12 @@
-use crate::services::khl::client::{ApiClient, ApiEndpoint, ClientConfig, ReqwestResult};
-use crate::services::khl::structs::*;
 use futures::future::join_all;
 
+use crate::services::khl::client::{ClientConfig, KHLApiClient, KhlEndpoint};
+use crate::services::khl::structs::*;
+use crate::services::traits::ApiResult;
+use crate::services::traits::*;
+
 pub struct KHLService {
-    pub api_client: ApiClient,
+    pub api_client: KHLApiClient,
 }
 
 impl Default for KHLService {
@@ -15,34 +18,39 @@ impl Default for KHLService {
 impl KHLService {
     pub fn new() -> Self {
         Self {
-            api_client: ApiClient::new(ClientConfig::default()),
+            api_client: KHLApiClient::new(ClientConfig::default()),
         }
     }
 
-    pub async fn fetch_standings(&self) -> ReqwestResult<Table> {
+    pub async fn standings(&self) -> ApiResult<Table> {
         let data = self
             .api_client
-            .fetch::<Table>(ApiEndpoint::StandingsNow)
+            .fetch::<KhlEndpoint, Table>(KhlEndpoint::StandingsNow)
             .await?;
+
         Ok(data)
     }
 
-    pub async fn fetch_team(&self, teamid: u32) -> ReqwestResult<TeamDetail> {
-        let endpoint = ApiEndpoint::TeamDetails(teamid);
-        let data = self.api_client.fetch::<TeamDetail>(endpoint).await?;
+    pub async fn team(&self, team_id: u32) -> ApiResult<TeamDetail> {
+        let data = self
+            .api_client
+            .fetch::<KhlEndpoint, TeamDetail>(KhlEndpoint::TeamDetails(team_id))
+            .await?;
+
         Ok(data)
     }
 
-    pub async fn fetch_all_teams(&self) -> ReqwestResult<Vec<TeamDetail>> {
-        let all_team = join_all(
-            self.fetch_standings()
+    pub async fn fetch_all_teams(&self) -> ApiResult<Vec<TeamDetail>> {
+        let all_teams = join_all(
+            self.standings()
                 .await?
                 .divisions
                 .into_iter()
-                .flat_map(|divisions| divisions.teams)
-                .map(|team| self.fetch_team(team.clubid)),
+                .flat_map(|division| division.teams)
+                .map(|team| self.team(team.clubid)),
         )
         .await;
-        Ok(all_team.into_iter().flatten().collect())
+
+        Ok(all_teams.into_iter().flatten().collect())
     }
 }
