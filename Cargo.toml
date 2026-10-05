@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+diesel = { version = "2.3.13", features = ["sqlite"] }
+diesel_migrations = "2.3.2"
 futures = "0.3.34"
 regex = "1.13.1"
 reqwest = { version = "0.13.4", features = ["json", "rustls", "cookies", "form"] }
