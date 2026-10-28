@@ -40,7 +40,15 @@ impl KHLService {
         Ok(data)
     }
 
-    pub async fn fetch_all_teams(&self) -> ApiResult<Vec<TeamDetail>> {
+    pub async fn player(&self, player_id: u32) -> ApiResult<PlayerDetail> {
+        let data = self
+            .api_client
+            .fetch::<KhlEndpoint, PlayerDetail>(KhlEndpoint::PlayerStats(player_id))
+            .await?;
+        Ok(data)
+    }
+
+    pub async fn all_teams(&self) -> ApiResult<Vec<TeamDetail>> {
         let all_teams = join_all(
             self.standings()
                 .await?

@@ -19,6 +19,7 @@ const BASE_URL: &str = "https://www.khl.ru";
 pub enum KhlEndpoint {
     StandingsNow,
     TeamDetails(u32),
+    PlayerStats(u32),
 }
 
 impl Endpoint for KhlEndpoint {
@@ -37,6 +38,13 @@ impl Endpoint for KhlEndpoint {
                 args: Some(vec![(
                     Cow::Borrowed("values[club_id]"),
                     Cow::Owned(club_id.to_string()),
+                )]),
+            },
+            KhlEndpoint::PlayerStats(player_id) => RequestParts {
+                path: Cow::Borrowed("rest/players/stats/"),
+                args: Some(vec![(
+                    Cow::Borrowed("values[id]"),
+                    Cow::Owned(player_id.to_string()),
                 )]),
             },
         }

@@ -95,3 +95,26 @@ pub struct Stats {
     pub sum: String,
     pub sum_proc: String,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct PlayerDetail {
+    pub data: PlayerData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct PlayerData {
+    pub stats_summary: Vec<PlayerSummary>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct PlayerSummary {
+    pub key: String,
+    pub stats: PlayerStats,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct PlayerStats {
+    pub g: String,
+    pub gp: String,
+    pub pts: String,
+}

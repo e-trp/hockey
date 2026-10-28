@@ -15,6 +15,7 @@ pub enum NhlEndpoint<'a> {
     StandingsNow,
     StandingsByYear(u32),
     TeamDetails { id: &'a str },
+    PlayerDetail {id: &'a str },
 }
 
 impl<'a> Endpoint for NhlEndpoint<'a> {
@@ -30,6 +31,10 @@ impl<'a> Endpoint for NhlEndpoint<'a> {
             },
             NhlEndpoint::TeamDetails { id } => RequestParts {
                 path: Cow::Owned(format!("teams/{id}")),
+                args: None,
+            },
+            NhlEndpoint::PlayerDetail { id } => RequestParts {
+                path: Cow::Owned(format!("player/{id}/landing")),
                 args: None,
             },
         }

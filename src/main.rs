@@ -14,7 +14,10 @@ async fn main() -> ServicetResult<()> {
     let response = khl_service.team(7u32).await;
     println!("{:?}", response);
 
-    let response = khl_service.fetch_all_teams().await;
+    let response = khl_service.all_teams().await;
+    println!("{:?}", response);
+
+    let response = khl_service.player(29956).await;
     println!("{:?}", response);
 
     Ok(())
